@@ -1,0 +1,24 @@
+name: midisrv check
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check for midisrv
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          "OS: $($os.Caption) $($os.Version) (UBR $((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').UBR))"
+          $exe = Join-Path $env:windir 'System32\midisrv.exe'
+          if (Test-Path $exe) { "midisrv.exe: present, version $((Get-Item $exe).VersionInfo.FileVersion)" } else { "midisrv.exe: NOT present" }
+          $svc = Get-Service midisrv -ErrorAction SilentlyContinue
+          if ($svc) {
+            "Service: Status=$($svc.Status) StartType=$($svc.StartType)"
+            try { Start-Service midisrv -ErrorAction Stop; Start-Sleep 3; "After Start-Service: $((Get-Service midisrv).Status)" } catch { "Start-Service failed: $($_.Exception.Message)" }
+          } else { "Service: NOT registered" }
